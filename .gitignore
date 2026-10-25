@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+datos_demo.json
+datos.json
+
+# archivos de herramientas de IA / personales (no van al repo)
+.claude/
+CLAUDE.md
