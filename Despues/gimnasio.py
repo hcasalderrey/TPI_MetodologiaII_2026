@@ -1,18 +1,28 @@
 import json
 import os
 
+class RepositorioJson:
+    def __init__(self, archivo):
+        self.archivo = archivo
+
+    def cargar(self):
+        if not os.path.exists(self.archivo):
+            return {"socios": [], "pagos": []}
+        try:
+            with open(self.archivo, encoding="utf-8") as archivo:
+                return json.load(archivo)
+        except:
+            print("error leyendo archivo")
+            return {"socios": [], "pagos": []}
+
+    def guardar(self, datos):
+        with open(self.archivo, "w", encoding="utf-8") as archivo:
+            json.dump(datos, archivo)
 
 class GimnasioService:
     def __init__(self, archivo="datos.json"):
-        self.archivo = archivo
-        self.d = {"socios": [], "pagos": []}
-        if os.path.exists(archivo):
-            try:
-                f = open(archivo)
-                self.d = json.load(f)
-                f.close()
-            except:
-                print("error leyendo archivo")
+        self.repositorio = RepositorioJson(archivo)
+        self.d = self.repositorio.cargar()
 
     def _calcular_cuota(self, plan):
         if plan == "M":
@@ -50,9 +60,7 @@ class GimnasioService:
             "estado": "moroso", "fecha_alta": fecha_alta}
         self.d["socios"].append(x)
         # guardar
-        f = open(self.archivo, "w")
-        json.dump(self.d, f)
-        f.close()
+        self.repositorio.guardar(self.d)
         print("Socio registrado: " + nombre + " " + apellido + " - cuota $" + str(c))
         return x
 
@@ -71,9 +79,7 @@ class GimnasioService:
             return None
         socio["plan"] = plan_nuevo
         socio["cuota"] = c
-        f = open(self.archivo, "w")
-        json.dump(self.d, f)
-        f.close()
+        self.repositorio.guardar(self.d)
         print("Plan cambiado: " + socio["nombre"] + " - nueva cuota $" + str(c))
         return socio
 
@@ -94,9 +100,7 @@ class GimnasioService:
         p = {"dni": dni, "monto": monto, "dia": dia}
         self.d["pagos"].append(p)
         socio["estado"] = "activo"
-        f = open(self.archivo, "w")
-        json.dump(self.d, f)
-        f.close()
+        self.repositorio.guardar(self.d)
         print("Pago registrado: " + socio["nombre"] + " - $" + str(monto))
         return p
 
