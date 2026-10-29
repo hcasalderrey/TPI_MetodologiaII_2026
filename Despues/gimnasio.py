@@ -22,6 +22,11 @@ class GimnasioService:
         elif plan == "A":
             return round(10000 * 12 * 0.85, 2)
         return None
+    def _buscar_socio(self, dni):
+        for socio in self.d["socios"]:
+            if socio["dni"] == dni:
+                return socio
+        return None
     def registrar_socio(self, nombre, apellido, dni, email, telefono, plan, fecha_alta):
         # validar
         if nombre == "" or apellido == "":
@@ -33,10 +38,9 @@ class GimnasioService:
         if "@" not in email or "." not in email:
             print("Error: email invalido")
             return None
-        for s in self.d["socios"]:
-            if s["dni"] == dni:
-                print("Error: DNI ya registrado")
-                return None
+        if self._buscar_socio(dni) is not None:
+            print("Error: DNI ya registrado")
+            return None
         c = self._calcular_cuota(plan)
         if c is None:
             print("Error: plan invalido")
@@ -56,10 +60,7 @@ class GimnasioService:
         if len(dni) != 8 or not dni.isdigit():
             print("Error: DNI invalido")
             return None
-        socio = None
-        for s in self.d["socios"]:
-            if s["dni"] == dni:
-                socio = s
+        socio = self._buscar_socio(dni)
         if socio == None:
             print("Error: socio no existe")
             return None
@@ -80,10 +81,7 @@ class GimnasioService:
         if len(dni) != 8 or not dni.isdigit():
             print("Error: DNI invalido")
             return None
-        socio = None
-        for s in self.d["socios"]:
-            if s["dni"] == dni:
-                socio = s
+        socio = self._buscar_socio(dni)
         if socio == None:
             print("Error: socio no existe")
             return None
