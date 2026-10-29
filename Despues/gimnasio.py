@@ -14,6 +14,14 @@ class GimnasioService:
             except:
                 print("error leyendo archivo")
 
+    def _calcular_cuota(self, plan):
+        if plan == "M":
+            return 10000
+        elif plan == "T":
+            return round(10000 * 3 * 0.90, 2)
+        elif plan == "A":
+            return round(10000 * 12 * 0.85, 2)
+        return None
     def registrar_socio(self, nombre, apellido, dni, email, telefono, plan, fecha_alta):
         # validar
         if nombre == "" or apellido == "":
@@ -29,19 +37,13 @@ class GimnasioService:
             if s["dni"] == dni:
                 print("Error: DNI ya registrado")
                 return None
-        # calcular cuota
-        if plan == "M":
-            c = 10000
-        elif plan == "T":
-            c = round(10000 * 3 * 0.90, 2)
-        elif plan == "A":
-            c = round(10000 * 12 * 0.85, 2)
-        else:
+        c = self._calcular_cuota(plan)
+        if c is None:
             print("Error: plan invalido")
             return None
-        x = {"nombre": nombre, "apellido": apellido, "dni": dni, "email": email,
-             "telefono": telefono, "plan": plan, "cuota": c,
-             "estado": "moroso", "fecha_alta": fecha_alta}
+        x= {"nombre": nombre, "apellido": apellido, "dni": dni, "email": email,
+            "telefono": telefono, "plan": plan, "cuota": c,
+            "estado": "moroso", "fecha_alta": fecha_alta}
         self.d["socios"].append(x)
         # guardar
         f = open(self.archivo, "w")
@@ -61,13 +63,9 @@ class GimnasioService:
         if socio == None:
             print("Error: socio no existe")
             return None
-        if plan_nuevo == "M":
-            c = 10000
-        elif plan_nuevo == "T":
-            c = round(10000 * 3 * 0.90, 2)
-        elif plan_nuevo == "A":
-            c = round(10000 * 12 * 0.85, 2)
-        else:
+
+        c = self._calcular_cuota(plan_nuevo)
+        if c is None:
             print("Error: plan invalido")
             return None
         socio["plan"] = plan_nuevo
