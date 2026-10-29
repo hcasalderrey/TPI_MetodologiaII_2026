@@ -1,5 +1,16 @@
 import json
 import os
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class DatosAltaSocio:
+    nombre: str
+    apellido: str
+    dni: str
+    email: str
+    telefono: str
+    plan: str
+    fecha_alta: str
 
 class RepositorioJson:
     def __init__(self, archivo):
@@ -37,32 +48,48 @@ class GimnasioService:
             if socio["dni"] == dni:
                 return socio
         return None
+
     def registrar_socio(self, nombre, apellido, dni, email, telefono, plan, fecha_alta):
-        # validar
-        if nombre == "" or apellido == "":
+        datos = DatosAltaSocio(nombre, apellido, dni, email, telefono, plan, fecha_alta)
+        return self.registrar_socio_con_datos(datos)
+
+    def registrar_socio_con_datos(self, datos: DatosAltaSocio):
+        if datos.nombre == "" or datos.apellido == "":
             print("Error: nombre invalido")
             return None
-        if len(dni) != 8 or not dni.isdigit():
+        if len(datos.dni) != 8 or not datos.dni.isdigit():
             print("Error: DNI invalido")
             return None
-        if "@" not in email or "." not in email:
+        if "@" not in datos.email or "." not in datos.email:
             print("Error: email invalido")
             return None
-        if self._buscar_socio(dni) is not None:
+        if self._buscar_socio(datos.dni) is not None:
             print("Error: DNI ya registrado")
             return None
-        c = self._calcular_cuota(plan)
-        if c is None:
+
+        cuota = self._calcular_cuota(datos.plan)
+        if cuota is None:
             print("Error: plan invalido")
             return None
-        x= {"nombre": nombre, "apellido": apellido, "dni": dni, "email": email,
-            "telefono": telefono, "plan": plan, "cuota": c,
-            "estado": "moroso", "fecha_alta": fecha_alta}
-        self.d["socios"].append(x)
-        # guardar
+
+        socio = {
+            "nombre": datos.nombre,
+            "apellido": datos.apellido,
+            "dni": datos.dni,
+            "email": datos.email,
+            "telefono": datos.telefono,
+            "plan": datos.plan,
+            "cuota": cuota,
+            "estado": "moroso",
+            "fecha_alta": datos.fecha_alta,
+        }
+        self.d["socios"].append(socio)
         self.repositorio.guardar(self.d)
-        print("Socio registrado: " + nombre + " " + apellido + " - cuota $" + str(c))
-        return x
+        print(
+            "Socio registrado: "
+            + datos.nombre + " " + datos.apellido + " - cuota $" + str(cuota)
+        )
+        return socio
 
     def cambiar_plan(self, dni, plan_nuevo):
         if len(dni) != 8 or not dni.isdigit():
