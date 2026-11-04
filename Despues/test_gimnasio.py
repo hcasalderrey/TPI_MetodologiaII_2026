@@ -5,6 +5,9 @@ from gimnasio import (
     DatosAltaSocio,
     ErrorPersistencia,
     GimnasioService,
+    PlanAnual,
+    PlanMensual,
+    PlanTrimestral,
     RepositorioJson,
 )
 
@@ -117,3 +120,10 @@ def test_repositorio_informa_error_si_no_puede_guardar(tmp_path):
         match="No fue posible guardar",
     ):
         repositorio.guardar({"socios": [], "pagos": []})
+
+
+#Pruebas de los refactorings estructurales
+def test_cada_plan_calcula_su_cuota():
+    assert PlanMensual().calcular_cuota() == 10000
+    assert PlanTrimestral().calcular_cuota() == 27000
+    assert PlanAnual().calcular_cuota() == 102000

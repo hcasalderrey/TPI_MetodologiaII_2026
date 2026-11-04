@@ -1,5 +1,6 @@
 import json
 import os
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 #Constantes utilizadas en el proyecto
@@ -43,6 +44,35 @@ class DatosAltaSocio:
     plan: str
     fecha_alta: str
 
+#Planes (Strategy): un plan nuevo es una clase nueva, sin tocar el service
+class Plan(ABC):
+    @abstractmethod
+    def calcular_cuota(self):
+        """Devuelve la cuota que paga el socio con este plan."""
+
+
+class PlanMensual(Plan):
+    def calcular_cuota(self):
+        return CUOTA_BASE
+
+
+class PlanTrimestral(Plan):
+    def calcular_cuota(self):
+        return round(CUOTA_BASE * MESES_PLAN_TRIMESTRAL * FACTOR_PLAN_TRIMESTRAL, 2)
+
+
+class PlanAnual(Plan):
+    def calcular_cuota(self):
+        return round(CUOTA_BASE * MESES_PLAN_ANUAL * FACTOR_PLAN_ANUAL, 2)
+
+
+PLANES = {
+    PLAN_MENSUAL: PlanMensual(),
+    PLAN_TRIMESTRAL: PlanTrimestral(),
+    PLAN_ANUAL: PlanAnual(),
+}
+
+
 class RepositorioJson:
     def __init__(self, archivo):
         self.archivo = archivo
@@ -77,28 +107,13 @@ class GimnasioService:
         self.repositorio = RepositorioJson(archivo)
         self.datos = self.repositorio.cargar()
 
-    def _calcular_cuota(self, plan):
-        if plan == PLAN_MENSUAL:
-            return CUOTA_BASE
+    def _calcular_cuota(self, codigo_plan):
+        plan = PLANES.get(codigo_plan)
+        if plan is None:
+            return None
+        return plan.calcular_cuota()
 
-        if plan == PLAN_TRIMESTRAL:
-            return round(
-                CUOTA_BASE
-                * MESES_PLAN_TRIMESTRAL
-                * FACTOR_PLAN_TRIMESTRAL,
-                2,
-            )
 
-        if plan == PLAN_ANUAL:
-            return round(
-                CUOTA_BASE
-                * MESES_PLAN_ANUAL
-                * FACTOR_PLAN_ANUAL,
-                2,
-            )
-
-        return None
-    
     def _buscar_socio(self, dni):
         for socio in self.datos["socios"]:
             if socio["dni"] == dni:
