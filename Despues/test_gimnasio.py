@@ -9,6 +9,7 @@ from gimnasio import (
     PlanMensual,
     PlanTrimestral,
     RepositorioJson,
+    ReporteMorosos,
 )
 
 
@@ -127,3 +128,14 @@ def test_cada_plan_calcula_su_cuota():
     assert PlanMensual().calcular_cuota() == 10000
     assert PlanTrimestral().calcular_cuota() == 27000
     assert PlanAnual().calcular_cuota() == 102000
+
+
+def test_reporte_morosos_calcula_lineas_y_total():
+    socios = [
+        {"apellido": "Perez", "nombre": "Ana", "dni": "11111111", "cuota": 10000, "estado": "moroso"},
+        {"apellido": "Gomez", "nombre": "Luis", "dni": "22222222", "cuota": 27000, "estado": "activo"},
+    ]
+    reporte = ReporteMorosos(socios)
+
+    assert reporte.lineas() == ["Perez, Ana (11111111) debe $10000"]
+    assert reporte.total_adeudado() == 10000

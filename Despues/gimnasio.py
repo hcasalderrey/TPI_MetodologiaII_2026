@@ -102,6 +102,33 @@ class RepositorioJson:
                 f"No fue posible guardar los datos en '{self.archivo}'"
             ) from error
 
+#Reporte: sale del God Class (Move Method)
+class ReporteMorosos:
+    def __init__(self, socios):
+        self.socios = socios
+
+    def lineas(self):
+        return [
+            socio["apellido"] + ", " + socio["nombre"]
+            + " (" + socio["dni"] + ") debe $" + str(socio["cuota"])
+            for socio in self.socios
+            if socio["estado"] == ESTADO_MOROSO
+        ]
+
+    def total_adeudado(self):
+        return sum(
+            socio["cuota"] for socio in self.socios if socio["estado"] == ESTADO_MOROSO
+        )
+
+    def imprimir(self):
+        lineas = self.lineas()
+        print("=== MOROSOS ===")
+        for linea in lineas:
+            print(linea)
+        print("Total adeudado: $" + str(self.total_adeudado()))
+        return lineas
+
+
 class GimnasioService:
     def __init__(self, archivo=ARCHIVO_POR_DEFECTO):
         self.repositorio = RepositorioJson(archivo)
@@ -203,17 +230,7 @@ class GimnasioService:
         return pago
 
     def reporte_morosos(self):
-        socios_morosos = []
-        total_adeudado = 0
-        for socio in self.datos["socios"]:
-            if socio["estado"] == ESTADO_MOROSO:
-                socios_morosos.append(socio["apellido"] + ", " + socio["nombre"] + " (" + socio["dni"] + ") debe $" + str(socio["cuota"]))
-                total_adeudado += socio["cuota"]
-        print("=== MOROSOS ===")
-        for reporte in socios_morosos:
-            print(reporte)
-        print("Total adeudado: $" + str(total_adeudado))
-        return socios_morosos
+        return ReporteMorosos(self.datos["socios"]).imprimir()
 
 
 if __name__ == "__main__":
