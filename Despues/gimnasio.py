@@ -2,6 +2,28 @@ import json
 import os
 from dataclasses import dataclass
 
+#Constantes utilizadas en el proyecto
+CUOTA_BASE = 10_000
+
+MESES_PLAN_TRIMESTRAL = 3
+FACTOR_PLAN_TRIMESTRAL = 0.90
+
+MESES_PLAN_ANUAL = 12
+FACTOR_PLAN_ANUAL = 0.85
+
+PLAN_MENSUAL = "M"
+PLAN_TRIMESTRAL = "T"
+PLAN_ANUAL = "A"
+
+DIA_LIMITE_PAGO = 10
+FACTOR_RECARGO_PAGO_TARDIO = 1.10
+
+LONGITUD_DNI = 8
+
+ESTADO_MOROSO = "moroso"
+ESTADO_ACTIVO = "activo"
+
+ARCHIVO_POR_DEFECTO = "datos.json"
 
 @dataclass(frozen=True)
 class DatosAltaSocio:
@@ -32,18 +54,32 @@ class RepositorioJson:
             json.dump(datos, archivo)
 
 class GimnasioService:
-    def __init__(self, archivo="datos.json"):
+    def __init__(self, archivo=ARCHIVO_POR_DEFECTO):
         self.repositorio = RepositorioJson(archivo)
         self.d = self.repositorio.cargar()
 
     def _calcular_cuota(self, plan):
-        if plan == "M":
-            return 10000
-        elif plan == "T":
-            return round(10000 * 3 * 0.90, 2)
-        elif plan == "A":
-            return round(10000 * 12 * 0.85, 2)
+        if plan == PLAN_MENSUAL:
+            return CUOTA_BASE
+
+        if plan == PLAN_TRIMESTRAL:
+            return round(
+                CUOTA_BASE
+                * MESES_PLAN_TRIMESTRAL
+                * FACTOR_PLAN_TRIMESTRAL,
+                2,
+            )
+
+        if plan == PLAN_ANUAL:
+            return round(
+                CUOTA_BASE
+                * MESES_PLAN_ANUAL
+                * FACTOR_PLAN_ANUAL,
+                2,
+            )
+
         return None
+    
     def _buscar_socio(self, dni):
         for socio in self.d["socios"]:
             if socio["dni"] == dni:
@@ -58,7 +94,7 @@ class GimnasioService:
         if datos.nombre == "" or datos.apellido == "":
             print("Error: nombre invalido")
             return None
-        if len(datos.dni) != 8 or not datos.dni.isdigit():
+        if len(datos.dni) != LONGITUD_DNI or not datos.dni.isdigit():
             print("Error: DNI invalido")
             return None
         if "@" not in datos.email or "." not in datos.email:
@@ -93,7 +129,7 @@ class GimnasioService:
         return socio
 
     def cambiar_plan(self, dni, plan_nuevo):
-        if len(dni) != 8 or not dni.isdigit():
+        if len(dni) != LONGITUD_DNI or not dni.isdigit():
             print("Error: DNI invalido")
             return None
         socio = self._buscar_socio(dni)
@@ -112,7 +148,7 @@ class GimnasioService:
         return socio
 
     def registrar_pago(self, dni, monto, dia):
-        if len(dni) != 8 or not dni.isdigit():
+        if len(dni) != LONGITUD_DNI or not dni.isdigit():
             print("Error: DNI invalido")
             return None
         socio = self._buscar_socio(dni)
@@ -120,14 +156,14 @@ class GimnasioService:
             print("Error: socio no existe")
             return None
         debido = socio["cuota"]
-        if dia > 10:
-            debido = round(debido * 1.10, 2)
+        if dia > DIA_LIMITE_PAGO:
+            debido = round(debido * FACTOR_RECARGO_PAGO_TARDIO, 2)
         if monto < debido:
             print("Error: monto insuficiente, se debe $" + str(debido))
             return None
         p = {"dni": dni, "monto": monto, "dia": dia}
         self.d["pagos"].append(p)
-        socio["estado"] = "activo"
+        socio["estado"] = ESTADO_ACTIVO
         self.repositorio.guardar(self.d)
         print("Pago registrado: " + socio["nombre"] + " - $" + str(monto))
         return p
@@ -136,7 +172,7 @@ class GimnasioService:
         lst = []
         t = 0
         for s in self.d["socios"]:
-            if s["estado"] == "moroso":
+            if s["estado"] == ESTADO_MOROSO:
                 lst.append(s["apellido"] + ", " + s["nombre"] + " (" + s["dni"] + ") debe $" + str(s["cuota"]))
                 t = t + s["cuota"]
         print("=== MOROSOS ===")
