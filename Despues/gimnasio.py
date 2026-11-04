@@ -56,7 +56,7 @@ class RepositorioJson:
 class GimnasioService:
     def __init__(self, archivo=ARCHIVO_POR_DEFECTO):
         self.repositorio = RepositorioJson(archivo)
-        self.d = self.repositorio.cargar()
+        self.datos = self.repositorio.cargar()
 
     def _calcular_cuota(self, plan):
         if plan == PLAN_MENSUAL:
@@ -81,50 +81,50 @@ class GimnasioService:
         return None
     
     def _buscar_socio(self, dni):
-        for socio in self.d["socios"]:
+        for socio in self.datos["socios"]:
             if socio["dni"] == dni:
                 return socio
         return None
 
     def registrar_socio(self, nombre, apellido, dni, email, telefono, plan, fecha_alta):
-        datos = DatosAltaSocio(nombre, apellido, dni, email, telefono, plan, fecha_alta)
-        return self.registrar_socio_con_datos(datos)
+        datos_alta = DatosAltaSocio(nombre, apellido, dni, email, telefono, plan, fecha_alta)
+        return self.registrar_socio_con_datos(datos_alta)
 
-    def registrar_socio_con_datos(self, datos: DatosAltaSocio):
-        if datos.nombre == "" or datos.apellido == "":
+    def registrar_socio_con_datos(self, datos_alta: DatosAltaSocio):
+        if datos_alta.nombre == "" or datos_alta.apellido == "":
             print("Error: nombre invalido")
             return None
-        if len(datos.dni) != LONGITUD_DNI or not datos.dni.isdigit():
+        if len(datos_alta.dni) != LONGITUD_DNI or not datos_alta.dni.isdigit():
             print("Error: DNI invalido")
             return None
-        if "@" not in datos.email or "." not in datos.email:
+        if "@" not in datos_alta.email or "." not in datos_alta.email:
             print("Error: email invalido")
             return None
-        if self._buscar_socio(datos.dni) is not None:
+        if self._buscar_socio(datos_alta.dni) is not None:
             print("Error: DNI ya registrado")
             return None
 
-        cuota = self._calcular_cuota(datos.plan)
+        cuota = self._calcular_cuota(datos_alta.plan)
         if cuota is None:
             print("Error: plan invalido")
             return None
 
         socio = {
-            "nombre": datos.nombre,
-            "apellido": datos.apellido,
-            "dni": datos.dni,
-            "email": datos.email,
-            "telefono": datos.telefono,
-            "plan": datos.plan,
+            "nombre": datos_alta.nombre,
+            "apellido": datos_alta.apellido,
+            "dni": datos_alta.dni,
+            "email": datos_alta.email,
+            "telefono": datos_alta.telefono,
+            "plan": datos_alta.plan,
             "cuota": cuota,
-            "estado": "moroso",
-            "fecha_alta": datos.fecha_alta,
+            "estado": ESTADO_MOROSO,
+            "fecha_alta": datos_alta.fecha_alta,
         }
-        self.d["socios"].append(socio)
-        self.repositorio.guardar(self.d)
+        self.datos["socios"].append(socio)
+        self.repositorio.guardar(self.datos)
         print(
             "Socio registrado: "
-            + datos.nombre + " " + datos.apellido + " - cuota $" + str(cuota)
+            + datos_alta.nombre + " " + datos_alta.apellido + " - cuota $" + str(cuota)
         )
         return socio
 
@@ -137,14 +137,14 @@ class GimnasioService:
             print("Error: socio no existe")
             return None
 
-        c = self._calcular_cuota(plan_nuevo)
-        if c is None:
+        cuota = self._calcular_cuota(plan_nuevo)
+        if cuota is None:
             print("Error: plan invalido")
             return None
         socio["plan"] = plan_nuevo
-        socio["cuota"] = c
-        self.repositorio.guardar(self.d)
-        print("Plan cambiado: " + socio["nombre"] + " - nueva cuota $" + str(c))
+        socio["cuota"] = cuota
+        self.repositorio.guardar(self.datos)
+        print("Plan cambiado: " + socio["nombre"] + " - nueva cuota $" + str(cuota))
         return socio
 
     def registrar_pago(self, dni, monto, dia):
@@ -161,38 +161,38 @@ class GimnasioService:
         if monto < debido:
             print("Error: monto insuficiente, se debe $" + str(debido))
             return None
-        p = {"dni": dni, "monto": monto, "dia": dia}
-        self.d["pagos"].append(p)
+        pago = {"dni": dni, "monto": monto, "dia": dia}
+        self.datos["pagos"].append(pago)
         socio["estado"] = ESTADO_ACTIVO
-        self.repositorio.guardar(self.d)
+        self.repositorio.guardar(self.datos)
         print("Pago registrado: " + socio["nombre"] + " - $" + str(monto))
-        return p
+        return pago
 
     def reporte_morosos(self):
-        lst = []
-        t = 0
-        for s in self.d["socios"]:
-            if s["estado"] == ESTADO_MOROSO:
-                lst.append(s["apellido"] + ", " + s["nombre"] + " (" + s["dni"] + ") debe $" + str(s["cuota"]))
-                t = t + s["cuota"]
+        socios_morosos = []
+        total_adeudado = 0
+        for socio in self.datos["socios"]:
+            if socio["estado"] == ESTADO_MOROSO:
+                socios_morosos.append(socio["apellido"] + ", " + socio["nombre"] + " (" + socio["dni"] + ") debe $" + str(socio["cuota"]))
+                total_adeudado += socio["cuota"]
         print("=== MOROSOS ===")
-        for r in lst:
-            print(r)
-        print("Total adeudado: $" + str(t))
-        return lst
+        for reporte in socios_morosos:
+            print(reporte)
+        print("Total adeudado: $" + str(total_adeudado))
+        return socios_morosos
 
 
 if __name__ == "__main__":
     # demo: escenario fijo, datos inventados
     if os.path.exists("datos_demo.json"):
         os.remove("datos_demo.json")
-    g = GimnasioService("datos_demo.json")
-    g.registrar_socio("Ana", "Perez", "11111111", "ana@mail.com", "1111", "M", "2026-10-01")
-    g.registrar_socio("Luis", "Gomez", "22222222", "luis@mail.com", "2222", "T", "2026-10-02")
-    g.registrar_socio("Marta", "Diaz", "33333333", "marta@mail.com", "3333", "A", "2026-10-03")
-    g.registrar_socio("Pedro", "Ruiz", "abc", "pedro@mail.com", "4444", "M", "2026-10-04")
-    g.cambiar_plan("11111111", "A")
-    g.registrar_pago("22222222", 27000, 5)
-    g.registrar_pago("33333333", 102000, 15)
-    g.registrar_pago("33333333", 112200, 15)
-    g.reporte_morosos()
+    gimnasio = GimnasioService("datos_demo.json")
+    gimnasio.registrar_socio("Ana", "Perez", "11111111", "ana@mail.com", "1111", "M", "2026-10-01")
+    gimnasio.registrar_socio("Luis", "Gomez", "22222222", "luis@mail.com", "2222", "T", "2026-10-02")
+    gimnasio.registrar_socio("Marta", "Diaz", "33333333", "marta@mail.com", "3333", "A", "2026-10-03")
+    gimnasio.registrar_socio("Pedro", "Ruiz", "abc", "pedro@mail.com", "4444", "M", "2026-10-04")
+    gimnasio.cambiar_plan("11111111", "A")
+    gimnasio.registrar_pago("22222222", 27000, 5)
+    gimnasio.registrar_pago("33333333", 102000, 15)
+    gimnasio.registrar_pago("33333333", 112200, 15)
+    gimnasio.reporte_morosos()

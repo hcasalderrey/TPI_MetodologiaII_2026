@@ -62,7 +62,7 @@ def test_reporte_lista_morosos(g):
 def test_los_datos_persisten_en_archivo(tmp_path):
     ruta = str(tmp_path / "datos.json")
     alta(GimnasioService(ruta))
-    assert len(GimnasioService(ruta).d["socios"]) == 1
+    assert len(GimnasioService(ruta).datos["socios"]) == 1
 
 def test_alta_con_objeto_de_datos(g):
     datos = DatosAltaSocio(
@@ -79,4 +79,4 @@ def test_alta_con_objeto_de_datos(g):
 
     assert socio["dni"] == "11111111"
     assert socio["cuota"] == 10000
-    assert len(g.d["socios"]) == 1
+    assert len(g.datos["socios"]) == 1
