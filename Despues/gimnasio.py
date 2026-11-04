@@ -44,6 +44,7 @@ class DatosAltaSocio:
     plan: str
     fecha_alta: str
 
+
 #Planes (Strategy): un plan nuevo es una clase nueva, sin tocar el service
 class Plan(ABC):
     @abstractmethod
@@ -73,7 +74,33 @@ PLANES = {
 }
 
 
-class RepositorioJson:
+#Validaciones compartidas
+def dni_es_valido(dni):
+    return len(dni) == LONGITUD_DNI and dni.isdigit()
+
+
+def email_es_valido(email):
+    return "@" in email and "." in email
+
+
+def calcular_monto_debido(cuota, dia):
+    if dia > DIA_LIMITE_PAGO:
+        return round(cuota * FACTOR_RECARGO_PAGO_TARDIO, 2)
+    return cuota
+
+
+#Persistencia: el service depende de esta interfaz, no del JSON
+class RepositorioDatos(ABC):
+    @abstractmethod
+    def cargar(self):
+        """Devuelve un dict con las claves 'socios' y 'pagos'."""
+
+    @abstractmethod
+    def guardar(self, datos):
+        """Persiste el dict completo de datos."""
+
+
+class RepositorioJson(RepositorioDatos):
     def __init__(self, archivo):
         self.archivo = archivo
 
@@ -101,6 +128,7 @@ class RepositorioJson:
             raise ErrorPersistencia(
                 f"No fue posible guardar los datos en '{self.archivo}'"
             ) from error
+
 
 #Reporte: sale del God Class (Move Method)
 class ReporteMorosos:
@@ -130,8 +158,8 @@ class ReporteMorosos:
 
 
 class GimnasioService:
-    def __init__(self, archivo=ARCHIVO_POR_DEFECTO):
-        self.repositorio = RepositorioJson(archivo)
+    def __init__(self, archivo=ARCHIVO_POR_DEFECTO, repositorio=None):
+        self.repositorio = repositorio if repositorio is not None else RepositorioJson(archivo)
         self.datos = self.repositorio.cargar()
 
     def _calcular_cuota(self, codigo_plan):
@@ -139,7 +167,6 @@ class GimnasioService:
         if plan is None:
             return None
         return plan.calcular_cuota()
-
 
     def _buscar_socio(self, dni):
         for socio in self.datos["socios"]:
@@ -155,10 +182,10 @@ class GimnasioService:
         if datos_alta.nombre == "" or datos_alta.apellido == "":
             print("Error: nombre invalido")
             return None
-        if len(datos_alta.dni) != LONGITUD_DNI or not datos_alta.dni.isdigit():
+        if not dni_es_valido(datos_alta.dni):
             print("Error: DNI invalido")
             return None
-        if "@" not in datos_alta.email or "." not in datos_alta.email:
+        if not email_es_valido(datos_alta.email):
             print("Error: email invalido")
             return None
         if self._buscar_socio(datos_alta.dni) is not None:
@@ -190,11 +217,11 @@ class GimnasioService:
         return socio
 
     def cambiar_plan(self, dni, plan_nuevo):
-        if len(dni) != LONGITUD_DNI or not dni.isdigit():
+        if not dni_es_valido(dni):
             print("Error: DNI invalido")
             return None
         socio = self._buscar_socio(dni)
-        if socio == None:
+        if socio is None:
             print("Error: socio no existe")
             return None
 
@@ -209,16 +236,14 @@ class GimnasioService:
         return socio
 
     def registrar_pago(self, dni, monto, dia):
-        if len(dni) != LONGITUD_DNI or not dni.isdigit():
+        if not dni_es_valido(dni):
             print("Error: DNI invalido")
             return None
         socio = self._buscar_socio(dni)
-        if socio == None:
+        if socio is None:
             print("Error: socio no existe")
             return None
-        debido = socio["cuota"]
-        if dia > DIA_LIMITE_PAGO:
-            debido = round(debido * FACTOR_RECARGO_PAGO_TARDIO, 2)
+        debido = calcular_monto_debido(socio["cuota"], dia)
         if monto < debido:
             print("Error: monto insuficiente, se debe $" + str(debido))
             return None
