@@ -5,7 +5,14 @@ from gimnasio import (
     DatosAltaSocio,
     ErrorPersistencia,
     GimnasioService,
+    PlanAnual,
+    PlanMensual,
+    PlanTrimestral,
+    RepositorioDatos,
     RepositorioJson,
+    ReporteMorosos,
+    dni_es_valido,
+    email_es_valido,
 )
 
 
@@ -117,3 +124,47 @@ def test_repositorio_informa_error_si_no_puede_guardar(tmp_path):
         match="No fue posible guardar",
     ):
         repositorio.guardar({"socios": [], "pagos": []})
+
+#Pruebas de los refactorings estructurales
+def test_cada_plan_calcula_su_cuota():
+    assert PlanMensual().calcular_cuota() == 10000
+    assert PlanTrimestral().calcular_cuota() == 27000
+    assert PlanAnual().calcular_cuota() == 102000
+
+
+def test_service_funciona_con_repositorio_inyectado_en_memoria():
+    class RepositorioEnMemoria(RepositorioDatos):
+        def __init__(self):
+            self.guardado = None
+
+        def cargar(self):
+            return {"socios": [], "pagos": []}
+
+        def guardar(self, datos):
+            self.guardado = datos
+
+    repositorio = RepositorioEnMemoria()
+    servicio = GimnasioService(repositorio=repositorio)
+
+    alta(servicio)
+
+    assert repositorio.guardado["socios"][0]["dni"] == "11111111"
+
+
+def test_validaciones_compartidas():
+    assert dni_es_valido("12345678")
+    assert not dni_es_valido("1234")
+    assert not dni_es_valido("abcdefgh")
+    assert email_es_valido("ana@mail.com")
+    assert not email_es_valido("sin-arroba")
+
+
+def test_reporte_morosos_calcula_lineas_y_total():
+    socios = [
+        {"apellido": "Perez", "nombre": "Ana", "dni": "11111111", "cuota": 10000, "estado": "moroso"},
+        {"apellido": "Gomez", "nombre": "Luis", "dni": "22222222", "cuota": 27000, "estado": "activo"},
+    ]
+    reporte = ReporteMorosos(socios)
+
+    assert reporte.lineas() == ["Perez, Ana (11111111) debe $10000"]
+    assert reporte.total_adeudado() == 10000

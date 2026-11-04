@@ -1,5 +1,6 @@
 import json
 import os
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 #Constantes utilizadas en el proyecto
@@ -43,7 +44,63 @@ class DatosAltaSocio:
     plan: str
     fecha_alta: str
 
-class RepositorioJson:
+
+#Planes (Strategy): un plan nuevo es una clase nueva, sin tocar el service
+class Plan(ABC):
+    @abstractmethod
+    def calcular_cuota(self):
+        """Devuelve la cuota que paga el socio con este plan."""
+
+
+class PlanMensual(Plan):
+    def calcular_cuota(self):
+        return CUOTA_BASE
+
+
+class PlanTrimestral(Plan):
+    def calcular_cuota(self):
+        return round(CUOTA_BASE * MESES_PLAN_TRIMESTRAL * FACTOR_PLAN_TRIMESTRAL, 2)
+
+
+class PlanAnual(Plan):
+    def calcular_cuota(self):
+        return round(CUOTA_BASE * MESES_PLAN_ANUAL * FACTOR_PLAN_ANUAL, 2)
+
+
+PLANES = {
+    PLAN_MENSUAL: PlanMensual(),
+    PLAN_TRIMESTRAL: PlanTrimestral(),
+    PLAN_ANUAL: PlanAnual(),
+}
+
+
+#Validaciones compartidas
+def dni_es_valido(dni):
+    return len(dni) == LONGITUD_DNI and dni.isdigit()
+
+
+def email_es_valido(email):
+    return "@" in email and "." in email
+
+
+def calcular_monto_debido(cuota, dia):
+    if dia > DIA_LIMITE_PAGO:
+        return round(cuota * FACTOR_RECARGO_PAGO_TARDIO, 2)
+    return cuota
+
+
+#Persistencia: el service depende de esta interfaz, no del JSON
+class RepositorioDatos(ABC):
+    @abstractmethod
+    def cargar(self):
+        """Devuelve un dict con las claves 'socios' y 'pagos'."""
+
+    @abstractmethod
+    def guardar(self, datos):
+        """Persiste el dict completo de datos."""
+
+
+class RepositorioJson(RepositorioDatos):
     def __init__(self, archivo):
         self.archivo = archivo
 
@@ -72,33 +129,45 @@ class RepositorioJson:
                 f"No fue posible guardar los datos en '{self.archivo}'"
             ) from error
 
+
+#Reporte: sale del God Class (Move Method)
+class ReporteMorosos:
+    def __init__(self, socios):
+        self.socios = socios
+
+    def lineas(self):
+        return [
+            socio["apellido"] + ", " + socio["nombre"]
+            + " (" + socio["dni"] + ") debe $" + str(socio["cuota"])
+            for socio in self.socios
+            if socio["estado"] == ESTADO_MOROSO
+        ]
+
+    def total_adeudado(self):
+        return sum(
+            socio["cuota"] for socio in self.socios if socio["estado"] == ESTADO_MOROSO
+        )
+
+    def imprimir(self):
+        lineas = self.lineas()
+        print("=== MOROSOS ===")
+        for linea in lineas:
+            print(linea)
+        print("Total adeudado: $" + str(self.total_adeudado()))
+        return lineas
+
+
 class GimnasioService:
-    def __init__(self, archivo=ARCHIVO_POR_DEFECTO):
-        self.repositorio = RepositorioJson(archivo)
+    def __init__(self, archivo=ARCHIVO_POR_DEFECTO, repositorio=None):
+        self.repositorio = repositorio if repositorio is not None else RepositorioJson(archivo)
         self.datos = self.repositorio.cargar()
 
-    def _calcular_cuota(self, plan):
-        if plan == PLAN_MENSUAL:
-            return CUOTA_BASE
+    def _calcular_cuota(self, codigo_plan):
+        plan = PLANES.get(codigo_plan)
+        if plan is None:
+            return None
+        return plan.calcular_cuota()
 
-        if plan == PLAN_TRIMESTRAL:
-            return round(
-                CUOTA_BASE
-                * MESES_PLAN_TRIMESTRAL
-                * FACTOR_PLAN_TRIMESTRAL,
-                2,
-            )
-
-        if plan == PLAN_ANUAL:
-            return round(
-                CUOTA_BASE
-                * MESES_PLAN_ANUAL
-                * FACTOR_PLAN_ANUAL,
-                2,
-            )
-
-        return None
-    
     def _buscar_socio(self, dni):
         for socio in self.datos["socios"]:
             if socio["dni"] == dni:
@@ -113,10 +182,10 @@ class GimnasioService:
         if datos_alta.nombre == "" or datos_alta.apellido == "":
             print("Error: nombre invalido")
             return None
-        if len(datos_alta.dni) != LONGITUD_DNI or not datos_alta.dni.isdigit():
+        if not dni_es_valido(datos_alta.dni):
             print("Error: DNI invalido")
             return None
-        if "@" not in datos_alta.email or "." not in datos_alta.email:
+        if not email_es_valido(datos_alta.email):
             print("Error: email invalido")
             return None
         if self._buscar_socio(datos_alta.dni) is not None:
@@ -148,11 +217,11 @@ class GimnasioService:
         return socio
 
     def cambiar_plan(self, dni, plan_nuevo):
-        if len(dni) != LONGITUD_DNI or not dni.isdigit():
+        if not dni_es_valido(dni):
             print("Error: DNI invalido")
             return None
         socio = self._buscar_socio(dni)
-        if socio == None:
+        if socio is None:
             print("Error: socio no existe")
             return None
 
@@ -167,16 +236,14 @@ class GimnasioService:
         return socio
 
     def registrar_pago(self, dni, monto, dia):
-        if len(dni) != LONGITUD_DNI or not dni.isdigit():
+        if not dni_es_valido(dni):
             print("Error: DNI invalido")
             return None
         socio = self._buscar_socio(dni)
-        if socio == None:
+        if socio is None:
             print("Error: socio no existe")
             return None
-        debido = socio["cuota"]
-        if dia > DIA_LIMITE_PAGO:
-            debido = round(debido * FACTOR_RECARGO_PAGO_TARDIO, 2)
+        debido = calcular_monto_debido(socio["cuota"], dia)
         if monto < debido:
             print("Error: monto insuficiente, se debe $" + str(debido))
             return None
@@ -188,17 +255,7 @@ class GimnasioService:
         return pago
 
     def reporte_morosos(self):
-        socios_morosos = []
-        total_adeudado = 0
-        for socio in self.datos["socios"]:
-            if socio["estado"] == ESTADO_MOROSO:
-                socios_morosos.append(socio["apellido"] + ", " + socio["nombre"] + " (" + socio["dni"] + ") debe $" + str(socio["cuota"]))
-                total_adeudado += socio["cuota"]
-        print("=== MOROSOS ===")
-        for reporte in socios_morosos:
-            print(reporte)
-        print("Total adeudado: $" + str(total_adeudado))
-        return socios_morosos
+        return ReporteMorosos(self.datos["socios"]).imprimir()
 
 
 if __name__ == "__main__":
