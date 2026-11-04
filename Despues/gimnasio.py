@@ -25,6 +25,14 @@ ESTADO_ACTIVO = "activo"
 
 ARCHIVO_POR_DEFECTO = "datos.json"
 
+#Excepciones propias para manejo de errores
+class ErrorPersistencia(Exception):
+    """Error general relacionado con la persistencia de datos."""
+
+
+class ArchivoDatosInvalidoError(ErrorPersistencia):
+    """El archivo existe, pero no contiene JSON válido."""
+
 @dataclass(frozen=True)
 class DatosAltaSocio:
     nombre: str
@@ -42,16 +50,27 @@ class RepositorioJson:
     def cargar(self):
         if not os.path.exists(self.archivo):
             return {"socios": [], "pagos": []}
+
         try:
             with open(self.archivo, encoding="utf-8") as archivo:
                 return json.load(archivo)
-        except:
-            print("error leyendo archivo")
-            return {"socios": [], "pagos": []}
+        except json.JSONDecodeError as error:
+            raise ArchivoDatosInvalidoError(
+                f"El archivo '{self.archivo}' contiene JSON inválido"
+            ) from error
+        except OSError as error:
+            raise ErrorPersistencia(
+                f"No fue posible leer el archivo '{self.archivo}'"
+            ) from error
 
     def guardar(self, datos):
-        with open(self.archivo, "w", encoding="utf-8") as archivo:
-            json.dump(datos, archivo)
+        try:
+            with open(self.archivo, "w", encoding="utf-8") as archivo:
+                json.dump(datos, archivo)
+        except OSError as error:
+            raise ErrorPersistencia(
+                f"No fue posible guardar los datos en '{self.archivo}'"
+            ) from error
 
 class GimnasioService:
     def __init__(self, archivo=ARCHIVO_POR_DEFECTO):

@@ -1,6 +1,12 @@
 import pytest
 
-from gimnasio import DatosAltaSocio, GimnasioService
+from gimnasio import (
+    ArchivoDatosInvalidoError,
+    DatosAltaSocio,
+    ErrorPersistencia,
+    GimnasioService,
+    RepositorioJson,
+)
 
 
 @pytest.fixture
@@ -80,3 +86,34 @@ def test_alta_con_objeto_de_datos(g):
     assert socio["dni"] == "11111111"
     assert socio["cuota"] == 10000
     assert len(g.datos["socios"]) == 1
+
+#Pruebas sobre excepciones
+def test_repositorio_inicializa_datos_vacios_si_archivo_no_existe(tmp_path):
+    ruta = tmp_path / "inexistente.json"
+    repositorio = RepositorioJson(str(ruta))
+
+    datos = repositorio.cargar()
+
+    assert datos == {"socios": [], "pagos": []}
+
+
+def test_repositorio_informa_error_si_json_es_invalido(tmp_path):
+    ruta = tmp_path / "datos.json"
+    ruta.write_text("{contenido inválido", encoding="utf-8")
+    repositorio = RepositorioJson(str(ruta))
+
+    with pytest.raises(
+        ArchivoDatosInvalidoError,
+        match="contiene JSON inválido",
+    ):
+        repositorio.cargar()
+
+
+def test_repositorio_informa_error_si_no_puede_guardar(tmp_path):
+    repositorio = RepositorioJson(str(tmp_path))
+
+    with pytest.raises(
+        ErrorPersistencia,
+        match="No fue posible guardar",
+    ):
+        repositorio.guardar({"socios": [], "pagos": []})
